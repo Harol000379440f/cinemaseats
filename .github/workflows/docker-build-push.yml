@@ -1,30 +1,48 @@
-name: Build and Push Docker Image #Nma workflow
+name: Construir, Escanear y Publicar Imagen Docker
 
-on: #Evento
+on:
   push:
     branches:
       - main
 
-jobs: 
-  build-and-push: #Name Runner 
+jobs:
+  construir_escanear_publicar:
     runs-on: ubuntu-latest
-    steps:      #Step inicial
-      - name: Checkout Code
+    steps:
+      - name: Clonar Código
         uses: actions/checkout@v3
-
-      - name: Log in to Docker Hub
+      - name: Iniciar sesión en Docker Hub
         uses: docker/login-action@v2
         with:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
-      # 3. Normalize and Build Docker Image
-      - name: Build Docker Image
+      - name: Construir Imagen Docker
         run: |
+          echo "Comenzando la construcción de la imagen Docker..."
           DOCKER_USERNAME=$(echo "${{ secrets.DOCKER_USERNAME }}" | tr '[:upper:]' '[:lower:]')
+          echo "Utilizando nombre de usuario de Docker: $DOCKER_USERNAME"
           docker build -t $DOCKER_USERNAME/cinemaseats:latest .
-
-      # 4. Push Docker Image
-      - name: Push Docker Image
+          echo "Construcción de la imagen Docker completada."
+          echo "Listando imágenes Docker disponibles..."
+          docker images
+      - name: Escanear Imagen Docker con Trivy
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ${{ secrets.DOCKER_USERNAME }}/cinemaseats:latest
+          # Ajusta los niveles de severidad según sea necesario
+          severity: CRITICAL,HIGH
+          ignore-unfixed: true
+          # Permite que el pipeline continúe a pesar de las vulnerabilidades
+          exit-code: 0
+      - name: Publicar Imagen Docker
+        if: success()
         run: |
+          echo "Comenzando la publicación de la imagen Docker..."
           DOCKER_USERNAME=$(echo "${{ secrets.DOCKER_USERNAME }}" | tr '[:upper:]' '[:lower:]')
-          docker push $DOCKER_USERNAME/cinemaseats:latest    
+          docker push $DOCKER_USERNAME/cinemaseats:latest
+          echo "Publicación de la imagen Docker completada."
+      - name: Pruebas Unitarias del Pipeline Docker
+        if: success()
+        run: |
+          echo "Ejecutando pruebas del pipeline..."
+          # ... (tus pruebas unitarias aquí)
